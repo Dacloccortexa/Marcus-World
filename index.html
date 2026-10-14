@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mini Jeux Club</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout : app plein écran, look "autocollants" (bordures épaisses + ombre décalée), un seul thème clair assumé */
+:root{
+  --sky:#BFE3FF; --sky-deep:#8FC8F5; --ink:#1B2147; --paper:#FFFFFF;
+  --coral:#FF5A7A; --mint:#2FCB97; --sun:#FFC93C; --muted:#4A5384;
+  --display:'Lilita One','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+  --body:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%;margin:0}
+body{background:var(--sky);color:var(--ink);font-family:var(--body);font-weight:600;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+.screen{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px;gap:14px;max-width:560px;margin:0 auto;box-sizing:border-box}
+.sticker{background:var(--paper);border:3px solid var(--ink);border-radius:18px;box-shadow:4px 4px 0 var(--ink)}
+.btn{border:3px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);padding:12px 16px;font-weight:900;font-size:16px;background:var(--paper);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn.primary{background:var(--sun)}
+.btn.small{padding:7px 12px;font-size:14px;border-radius:11px}
+
+/* Accueil */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.logo{font-family:var(--display);font-size:clamp(30px,9vw,42px);line-height:.95;letter-spacing:.5px;margin:0}
+.logo span{color:var(--coral);-webkit-text-stroke:0}
+.player{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px}
+.player small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.player b{font-size:17px;font-weight:900}
+.edit{display:flex;gap:8px;padding:12px;align-items:center;flex-wrap:wrap}
+.edit input{flex:1;min-width:0;border:3px solid var(--ink);border-radius:11px;padding:9px 11px;font:inherit;font-weight:800;font-size:16px}
+.edit p{margin:0;width:100%;font-size:13px;color:var(--muted)}
+.games{display:grid;gap:14px;overflow-y:auto;padding:2px 6px 8px 2px;flex:1;align-content:start}
+.card{display:grid;grid-template-columns:72px 1fr auto;gap:14px;align-items:center;padding:12px 14px;text-align:left}
+.card .ic{width:72px;height:72px;border:3px solid var(--ink);border-radius:14px;display:grid;place-items:center}
+.card h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0;line-height:1}
+.card p{margin:4px 0 0;font-size:14px;color:var(--muted)}
+.card .rec{text-align:right;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card .rec b{display:block;font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums}
+.foot{display:flex;flex-direction:column;gap:8px}
+.mode{margin:0;font-size:12px;color:var(--muted);text-align:center}
+
+/* Jeu */
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bar h2{font-family:var(--display);font-weight:400;font-size:24px;margin:0}
+#area{position:relative;flex:1;min-height:0;border:3px solid var(--ink);border-radius:18px;overflow:hidden;background:var(--sky-deep);box-shadow:4px 4px 0 var(--ink);touch-action:none;user-select:none;-webkit-user-select:none}
+#area canvas{display:block}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(27,33,71,.45);padding:16px}
+.result{width:min(100%,340px);padding:20px;text-align:center;display:grid;gap:12px}
+.result .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.result .big{font-family:var(--display);font-size:72px;line-height:.9;font-variant-numeric:tabular-nums}
+.result .rec{display:inline-block;justify-self:center;background:var(--mint);border:3px solid var(--ink);border-radius:999px;padding:4px 12px;font-weight:900;font-size:14px}
+.result .rank{font-weight:800;min-height:1.3em}
+.result .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result .acts .primary{grid-column:1/-1}
+
+/* Couleurs */
+.cl{position:absolute;inset:0;display:flex;flex-direction:column;padding:14px;gap:12px;background:var(--paper)}
+.cl .timer{height:14px;border:3px solid var(--ink);border-radius:99px;overflow:hidden;background:#eef2ff}
+.cl .timer i{display:block;height:100%;background:var(--mint);transform-origin:left}
+.cl .hud{display:flex;justify-content:space-between;font-weight:900}
+.cl .rule{text-align:center;font-size:14px;color:var(--muted);margin:0}
+.cl .word{flex:1;display:grid;place-items:center;font-family:var(--display);font-size:clamp(48px,16vw,84px);letter-spacing:1px}
+.cl .word.bad{animation:shake .3s}
+.cl .word.ok{animation:pop .2s}
+.cl .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cl .opts button{height:74px;border:3px solid var(--ink);border-radius:16px;box-shadow:3px 3px 0 var(--ink);color:#fff;font-weight:900;font-size:17px;letter-spacing:.06em;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.cl .opts button:active{transform:translate(3px,3px);box-shadow:none}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+@keyframes pop{50%{transform:scale(1.08)}}
+
+/* Classement */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 4px 6px 2px}
+.tabs .btn{white-space:nowrap}
+.tabs .btn[aria-pressed="true"]{background:var(--coral);color:#fff}
+.seg{display:grid;grid-template-columns:1fr 1fr;padding:4px;gap:4px;border-radius:14px}
+.seg button{border:0;background:transparent;border-radius:9px;padding:8px;font-weight:900}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.list{flex:1;overflow-y:auto;padding:6px;margin:0;list-style:none}
+.list li{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:10px 10px;border-radius:12px;font-variant-numeric:tabular-nums}
+.list li+li{border-top:2px dashed #d7dcf2}
+.list li.me{background:var(--sun);border-top-color:transparent}
+.list .pos{font-family:var(--display);font-size:22px;text-align:center}
+.list li:nth-child(1) .pos{color:#C99700}.list li:nth-child(2) .pos{color:#8A93B8}.list li:nth-child(3) .pos{color:#C07040}
+.list .nm{font-weight:900;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .sc{font-family:var(--display);font-size:22px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head><body>
+
+<section id="home" class="screen">
+  <div class="top">
+    <h1 class="logo">Mini Jeux<br><span>Club</span></h1>
+    <div class="player sticker" id="playerBox">
+      <div><small>Joueur</small><b id="pseudoTxt">…</b></div>
+      <button class="btn small" id="editBtn" type="button">Changer</button>
+    </div>
+  </div>
+  <form class="edit sticker" id="editForm" hidden>
+    <input id="pseudoInput" maxlength="12" autocomplete="off" aria-label="Pseudo">
+    <button class="btn small primary" type="submit">OK</button>
+    <p>3 à 12 caractères : lettres, chiffres ou _. Pas de vrai nom.</p>
+  </form>
+  <div class="games" id="games"></div>
+  <div class="foot">
+    <button class="btn" id="boardBtn" type="button">Voir le classement</button>
+    <p class="mode" id="modeTxt"></p>
+  </div>
+</section>
+
+<section id="play" class="screen" hidden>
+  <div class="bar">
+    <button class="btn small" id="quitBtn" type="button">← Quitter</button>
+    <h2 id="playName"></h2>
+  </div>
+  <div id="area"></div>
+</section>
+
+<section id="board" class="screen" hidden>
+  <div class="bar">
+    <button class="btn small" id="boardBack" type="button">← Retour</button>
+    <h2>Classement</h2>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="seg sticker">
+    <button type="button" id="pWeek" aria-pressed="true">Cette semaine</button>
+    <button type="button" id="pAll" aria-pressed="false">Depuis toujours</button>
+  </div>
+  <ol class="list sticker" id="list"></ol>
+</section>
+
+<script>
+/* ===== Config : renseigne ces 2 valeurs pour un classement entre tous les joueurs (Supabase) ===== */
+const CONFIG = { supabaseUrl: 'https://fjapgowehtspqxvubznk.supabase.co', supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqYXBnb3dlaHRzcHF4dnViem5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NzI4MTksImV4cCI6MjEwNzU0ODgxOX0.swM9flJEgHaTYtJL6flaw_-gdFMwfRvYiao1t181SQ8' };
+
+const $ = s => document.querySelector(s);
+const safeGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const safeSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+function weekKey(d = new Date()) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t - Date.UTC(y, 0, 1)) / 864e5 + 1) / 7);
+  return y + '-W' + String(w).padStart(2, '0');
+}
+
+/* ===== Pseudo ===== */
+const ANIMAUX = ['Panda','Requin','Faucon','Tigre','Loutre','Gecko','Lynx','Koala','Dauphin','Renard'];
+let pseudo = safeGet('mjc_pseudo', null);
+if (!pseudo) { pseudo = ANIMAUX[Math.floor(Math.random() * ANIMAUX.length)] + (10 + Math.floor(Math.random() * 90)); safeSet('mjc_pseudo', pseudo); }
+const cleanPseudo = s => s.replace(/[^A-Za-z0-9_]/g, '').slice(0, 12);
+
+/* ===== Scores (Supabase si configuré, sinon local à l'appareil) ===== */
+const Store = {
+  remote: !!(CONFIG.supabaseUrl && CONFIG.supabaseKey),
+  headers() { return { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json' }; },
+  async submit(game, score, duration) {
+    if (this.remote) {
+      const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/scores', { method: 'POST', headers: { ...this.headers(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ game, pseudo, score, duration_ms: Math.round(duration) }) });
+      if (!r.ok) throw new Error('submit');
+    } else {
+      const all = safeGet('mjc_scores', []); all.push({ game, pseudo, score, week: weekKey(), ts: Date.now() }); safeSet('mjc_scores', all.slice(-2000));
+    }
+  },
+  async top(game, period) {
+    let rows;
+    if (this.remote) {
+      let q = `/rest/v1/scores?select=pseudo,score&game=eq.${game}&order=score.desc&limit=500`;
+      if (period === 'week') q += `&week=eq.${weekKey()}`;
+      const r = await fetch(CONFIG.supabaseUrl + q, { headers: this.headers() });
+      if (!r.ok) throw new Error('top');
+      rows = await r.json();
+    } else {
+      rows = safeGet('mjc_scores', []).filter(s => s.game === game && (period !== 'week' || s.week === weekKey()));
+    }
+    const best = new Map();
+    rows.forEach(s => { if (!best.has(s.pseudo) || best.get(s.pseudo) < s.score) best.set(s.pseudo, s.score); });
+    return [...best].map(([p, s]) => ({ pseudo: p, score: s })).sort((a, b) => b.score - a.score).slice(0, 50);
+  }
+};
+
+/* ===== Moteur canvas commun ===== */
+function runCanvas(area, game) {
+  const c = document.createElement('canvas'); area.appendChild(c);
+  const ctx = c.getContext('2d'); let W = 0, H = 0, first = true;
+  function fit() {
+    const r = area.getBoundingClientRect(); W = r.width; H = r.height;
+    const d = window.devicePixelRatio || 1;
+    c.width = Math.round(W * d); c.height = Math.round(H * d); c.style.width = W + 'px'; c.style.height = H + 'px';
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    if (first) { first = false; game.init(W, H); } else game.resize(W, H);
+  }
+  fit();
+  let last = performance.now(), raf, alive = true;
+  function frame(t) { if (!alive) return; const dt = Math.min(0.033, (t - last) / 1000); last = t; game.update(dt); game.draw(ctx, W, H); raf = requestAnimationFrame(frame); }
+  raf = requestAnimationFrame(frame);
+  const tap = e => { e.preventDefault(); game.tap(); };
+  const key = e => { if (e.code === 'Space') { e.preventDefault(); game.tap(); } };
+  c.addEventListener('pointerdown', tap); addEventListener('keydown', key);
+  const ro = new ResizeObserver(() => fit()); ro.observe(area);
+  return () => { alive = false; cancelAnimationFrame(raf); removeEventListener('keydown', key); ro.disconnect(); c.remove(); };
+}
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function bigText(ctx, txt, x, y, size, fill) {
+  ctx.font = `${size}px 'Lilita One', 'Trebuchet MS', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(4, size / 7); ctx.strokeStyle = '#1B2147'; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y);
+  ctx.fillStyle = fill; ctx.fillText(txt, x, y);
+}
+
+/* ===== Jeu 1 : Tour ===== */
+function Tour(end) {
+  const BH = 26;
+  let W, H, blocks, cur, score, debris, cam, over, t0, flash;
+  const color = i => `hsl(${(i * 14 + 340) % 360} 80% 62%)`;
+  function spawn() {
+    const top = blocks[blocks.length - 1], fromLeft = blocks.length % 2 === 0;
+    cur = { x: fromLeft ? 0 : W - top.w, w: top.w, dir: fromLeft ? 1 : -1, speed: Math.min(150 + blocks.length * 9, 430) };
+  }
+  function blk(ctx, x, y, w, col) { ctx.fillStyle = col; ctx.strokeStyle = '#1B2147'; ctx.lineWidth = 2.5; rrect(ctx, x, y, w, BH, 5); ctx.fill(); ctx.stroke(); }
+  return {
+    init(w, h) { W = w; H = h; const bw = Math.min(W * 0.62, 260); blocks = [{ x: (W - bw) / 2, w: bw }]; score = 0; debris = []; cam = 0; over = false; flash = 0; t0 = performance.now(); spawn(); },
+    resize(w, h) { W = w; H = h; },
+    tap() {
+      if (over) return;
+      const top = blocks[blocks.length - 1], lvl = blocks.length;
+      const l = Math.max(cur.x, top.x), r = Math.min(cur.x + cur.w, top.x + top.w);
+      if (r <= l) { over = true; debris.push({ x: cur.x, w: cur.w, lvl, vy: 0, dy: 0, col: color(lvl) }); setTimeout(() => end(score, performance.now() - t0), 700); return; }
+      let nx = l, nw = r - l;
+      if (Math.abs(cur.x - top.x) < 5) { nx = top.x; nw = top.w; flash = 1; }
+      else if (cur.x < top.x) debris.push({ x: cur.x, w: top.x - cur.x, lvl, vy: 0, dy: 0, col: color(lvl) });
+      else debris.push({ x: top.x + top.w, w: cur.x + cur.w - (top.x + top.w), lvl, vy: 0, dy: 0, col: color(lvl) });
+      blocks.push({ x: nx, w: nw }); score++; spawn();
+    },
+    update(dt) {
+      if (!over) { cur.x += cur.dir * cur.speed * dt; if (cur.x <= 0) { cur.x = 0; cur.dir = 1; } if (cur.x + cur.w >= W) { cur.x = W - cur.w; cur.dir = -1; } }
+      const target = Math.max(0, (blocks.length + 1) * BH - H * 0.55); cam += (target - cam) * Math.min(1, dt * 6);
+      debris.forEach(d => { d.vy += 1500 * dt; d.dy += d.vy * dt; }); debris = debris.filter(d => d.dy < H + 300);
+      flash = Math.max(0, flash - dt * 2.5);
+    },
+    draw(ctx) {
+      const g = ctx.createLinearGradient(0, 0, 0, H); const k = Math.min(1, score / 40);
+      g.addColorStop(0, `hsl(${205 + k * 50} 80% ${78 - k * 30}%)`); g.addColorStop(1, '#BFE3FF');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const baseY = H - 40, y = i => baseY - (i + 1) * BH + cam;
+      ctx.fillStyle = '#2FCB97'; ctx.fillRect(0, baseY + cam, W, H); ctx.fillStyle = '#1B2147'; ctx.fillRect(0, baseY + cam, W, 3);
+      blocks.forEach((b, i) => { if (y(i) < H + BH) blk(ctx, b.x, y(i), b.w, color(i)); });
+      if (!over) blk(ctx, cur.x, y(blocks.length), cur.w, color(blocks.length));
+      debris.forEach(d => blk(ctx, d.x, y(d.lvl) + d.dy, d.w, d.col));
+      bigText(ctx, String(score), W / 2, 52, 54, '#fff');
+      if (score === 0 && !over) bigText(ctx, 'Touche pour poser le bloc', W / 2, 104, 20, '#FFC93C');
+      if (flash > 0) { ctx.globalAlpha = flash; bigText(ctx, 'PARFAIT !', W / 2, 104, 30, '#FFC93C'); ctx.globalAlpha = 1; }
+    }
+  };
+}
+
+/* ===== Jeu 2 : Fusée ===== */
+function Fusee(end) {
+  const R = 14, WW = 58;
+  let W, H, X, y, vy, walls, score, started, over, spawnT, t0, flameT, clouds, time;
+  function spawn() {
+    const gap = Math.max(135, 195 - score * 3);
+    const gy = 70 + gap / 2 + Math.random() * Math.max(0, H - 140 - gap);
+    walls.push({ x: W + 10, gy, gap, passed: false });
+  }
+  function die() { if (over) return; over = true; setTimeout(() => end(score, performance.now() - t0), 650); }
+  return {
+    init(w, h) { W = w; H = h; X = W * 0.28; y = H / 2; vy = 0; walls = []; score = 0; started = false; over = false; spawnT = 0.6; flameT = 0; time = 0;
+      clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 14 + Math.random() * 22, s: 0.2 + Math.random() * 0.4 })); },
+    resize(w, h) { W = w; H = h; X = W * 0.28; },
+    tap() { if (over) return; if (!started) { started = true; t0 = performance.now(); } vy = -430; flameT = 0.18; },
+    update(dt) {
+      time += dt; flameT = Math.max(0, flameT - dt);
+      const speed = Math.min(300, 170 + score * 4);
+      clouds.forEach(c => { c.x -= speed * c.s * dt; if (c.x < -60) { c.x = W + 60; c.y = Math.random() * H; } });
+      if (!started) { y = H / 2 + Math.sin(time * 3) * 8; return; }
+      vy += 1300 * dt; y += vy * dt;
+      if (y < R) { y = R; vy = 0; }
+      if (y > H - R) { y = H - R; die(); }
+      if (over) return;
+      spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = 1.5; }
+      walls.forEach(w => {
+        w.x -= speed * dt;
+        if (X + R > w.x && X - R < w.x + WW && (y - R < w.gy - w.gap / 2 || y + R > w.gy + w.gap / 2)) die();
+        if (!w.passed && w.x + WW < X - R) { w.passed = true; score++; }
+      });
+      walls = walls.filter(w => w.x > -WW - 10);
+    },
+    draw(ctx) {
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#5B6BD8'); g.addColorStop(1, '#BFE3FF');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; clouds.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.arc(c.x + c.r, c.y + 4, c.r * .8, 0, 7); ctx.fill(); });
+      ctx.lineWidth = 3; ctx.strokeStyle = '#1B2147'; ctx.fillStyle = '#FF5A7A';
+      walls.forEach(w => {
+        const t = w.gy - w.gap / 2, b = w.gy + w.gap / 2;
+        rrect(ctx, w.x, -10, WW, t + 10, 10); ctx.fill(); ctx.stroke();
+        rrect(ctx, w.x, b, WW, H - b + 10, 10); ctx.fill(); ctx.stroke();
+      });
+      ctx.save(); ctx.translate(X, y); ctx.rotate(Math.max(-0.5, Math.min(0.9, vy / 700)) + Math.PI / 2 * 0);
+      if (flameT > 0 || !started) { ctx.fillStyle = '#FFC93C'; ctx.beginPath(); ctx.moveTo(-R - 2, -6); ctx.lineTo(-R - 18 - Math.random() * 8, 0); ctx.lineTo(-R - 2, 6); ctx.fill(); }
+      ctx.fillStyle = '#FF5A7A'; ctx.strokeStyle = '#1B2147'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(-R + 2, -R + 2); ctx.lineTo(-R - 6, -R - 4); ctx.lineTo(-R + 8, -6); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-R + 2, R - 2); ctx.lineTo(-R - 6, R + 4); ctx.lineTo(-R + 8, 6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, R + 8, R - 2, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8FC8F5'; ctx.beginPath(); ctx.arc(5, 0, 5, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.restore();
+      bigText(ctx, String(score), W / 2, 52, 54, '#fff');
+      if (!started) bigText(ctx, 'Touche pour décoller', W / 2, H * 0.72, 22, '#FFC93C');
+    }
+  };
+}
+
+/* ===== Jeu 3 : Couleurs (DOM) ===== */
+function Couleurs(area, end) {
+  const COLS = [{ n: 'ROUGE', c: '#E63946' }, { n: 'BLEU', c: '#2F6FED' }, { n: 'VERT', c: '#1FA463' }, { n: 'JAUNE', c: '#E0A800' }];
+  const DUR = 30;
+  const root = document.createElement('div'); root.className = 'cl';
+  root.innerHTML = `<div class="timer"><i></i></div><div class="hud"><span>Score <b class="s">0</b></span><span class="t">30 s</span></div>
+    <p class="rule">Touche la couleur de l'<b>encre</b>, pas le mot</p><div class="word"></div><div class="opts"></div>`;
+  area.appendChild(root);
+  const bar = root.querySelector('.timer i'), sEl = root.querySelector('.s'), tEl = root.querySelector('.t'), wEl = root.querySelector('.word'), oEl = root.querySelector('.opts');
+  let score = 0, left = DUR, ink, raf, last = performance.now(), t0 = performance.now(), done = false;
+  const rnd = n => Math.floor(Math.random() * n);
+  function next() {
+    const word = rnd(4); ink = Math.random() < 0.75 ? (word + 1 + rnd(3)) % 4 : word;
+    wEl.textContent = COLS[word].n; wEl.style.color = COLS[ink].c;
+    const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+    oEl.innerHTML = ''; order.forEach(i => { const b = document.createElement('button'); b.type = 'button'; b.textContent = COLS[i].n; b.style.background = COLS[i].c; b.onpointerdown = e => { e.preventDefault(); pick(i); }; oEl.appendChild(b); });
+  }
+  function anim(cls) { wEl.classList.remove('ok', 'bad'); void wEl.offsetWidth; wEl.classList.add(cls); }
+  function pick(i) { if (done) return; if (i === ink) { score++; sEl.textContent = score; anim('ok'); } else { left -= 2; anim('bad'); } next(); }
+  function frame(t) {
+    left -= (t - last) / 1000; last = t;
+    bar.style.transform = `scaleX(${Math.max(0, left / DUR)})`; tEl.textContent = Math.max(0, Math.ceil(left)) + ' s';
+    if (left <= 0) { done = true; end(score, performance.now() - t0); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  next(); raf = requestAnimationFrame(frame);
+  return () => { done = true; cancelAnimationFrame(raf); root.remove(); };
+}
+
+/* ===== Catalogue ===== */
+const ICONS = {
+  tour: `<svg width="44" height="44" viewBox="0 0 44 44"><g stroke="#1B2147" stroke-width="2.5"><rect x="6" y="31" width="32" height="9" rx="2" fill="#2FCB97"/><rect x="9" y="21" width="27" height="9" rx="2" fill="#FFC93C"/><rect x="12" y="11" width="22" height="9" rx="2" fill="#FF5A7A"/><rect x="16" y="2" width="16" height="8" rx="2" fill="#fff"/></g></svg>`,
+  fusee: `<svg width="44" height="44" viewBox="0 0 44 44"><g stroke="#1B2147" stroke-width="2.5" stroke-linejoin="round"><path d="M8 14 2 8l10 2z M8 30 2 36l10-2z" fill="#FF5A7A"/><ellipse cx="22" cy="22" rx="16" ry="11" fill="#fff"/><circle cx="27" cy="22" r="5" fill="#8FC8F5"/></g></svg>`,
+  couleurs: `<svg width="44" height="44" viewBox="0 0 44 44"><g stroke="#1B2147" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="4" fill="#E63946"/><rect x="24" y="4" width="16" height="16" rx="4" fill="#2F6FED"/><rect x="4" y="24" width="16" height="16" rx="4" fill="#1FA463"/><rect x="24" y="24" width="16" height="16" rx="4" fill="#E0A800"/></g></svg>`
+};
+const GAMES = {
+  tour: { name: 'Tour', desc: 'Empile les blocs le plus haut possible', bg: '#FFE07A', make: (a, e) => runCanvas(a, Tour(e)) },
+  fusee: { name: 'Fusée', desc: 'Passe entre les murs sans les toucher', bg: '#C9D2FF', make: (a, e) => runCanvas(a, Fusee(e)) },
+  couleurs: { name: 'Couleurs', desc: 'Lis vite, ne te fais pas piéger', bg: '#FFC4CF', make: (a, e) => Couleurs(a, e) }
+};
+
+/* ===== Navigation ===== */
+function show(id) { ['home', 'play', 'board'].forEach(s => $('#' + s).hidden = s !== id); }
+const best = safeGet('mjc_best', {});
+
+function renderHome() {
+  $('#pseudoTxt').textContent = pseudo;
+  $('#games').innerHTML = '';
+  Object.entries(GAMES).forEach(([id, g]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'card sticker';
+    b.innerHTML = `<span class="ic" style="background:${g.bg}">${ICONS[id]}</span><span><h2></h2><p></p></span><span class="rec">Record<b>${best[id] ?? '–'}</b></span>`;
+    b.querySelector('h2').textContent = g.name; b.querySelector('p').textContent = g.desc;
+    b.onclick = () => startGame(id);
+    $('#games').appendChild(b);
+  });
+  $('#modeTxt').textContent = Store.remote ? 'Classement en ligne entre tous les joueurs' : 'Mode test : classement enregistré sur cet appareil';
+}
+
+let stopFn = null, runId = 0, current = null;
+function startGame(id) {
+  current = id; show('play'); $('#playName').textContent = GAMES[id].name;
+  const area = $('#area'); if (stopFn) stopFn(); area.innerHTML = '';
+  const my = ++runId;
+  stopFn = GAMES[id].make(area, (score, dur) => { if (my === runId) gameOver(id, score, dur); });
+}
+function quitGame() { runId++; if (stopFn) stopFn(); stopFn = null; renderHome(); show('home'); }
+
+async function gameOver(id, score, dur) {
+  const isRec = score > 0 && score > (best[id] ?? -1);
+  if (isRec) { best[id] = score; safeSet('mjc_best', best); }
+  const ov = document.createElement('div'); ov.className = 'overlay';
+  ov.innerHTML = `<div class="result sticker"><span class="lbl">Score</span><span class="big">${score}</span>
+    ${isRec ? '<span class="rec">Nouveau record !</span>' : `<span class="lbl">Ton record : ${best[id] ?? 0}</span>`}
+    <span class="rank">…</span>
+    <div class="acts"><button class="btn primary" type="button" data-a="again">Rejouer</button>
+    <button class="btn" type="button" data-a="board">Classement</button><button class="btn" type="button" data-a="home">Accueil</button></div></div>`;
+  $('#area').appendChild(ov);
+  ov.querySelector('[data-a="again"]').onclick = () => startGame(id);
+  ov.querySelector('[data-a="board"]').onclick = () => { quitGame(); openBoard(id); };
+  ov.querySelector('[data-a="home"]').onclick = quitGame;
+  ov.querySelector('[data-a="again"]').focus();
+  const rankEl = ov.querySelector('.rank');
+  try {
+    if (score > 0) await Store.submit(id, score, dur);
+    const top = await Store.top(id, 'week');
+    const pos = top.findIndex(r => r.pseudo === pseudo);
+    rankEl.textContent = pos >= 0 ? `Tu es ${pos + 1}${pos === 0 ? 'er' : 'e'} cette semaine` : 'Marque des points pour entrer au classement';
+  } catch (e) { rankEl.textContent = 'Score non envoyé : vérifie ta connexion'; }
+}
+
+/* ===== Classement ===== */
+let bGame = 'tour', bPeriod = 'week';
+function openBoard(id) { if (id) bGame = id; show('board'); renderBoard(); }
+async function renderBoard() {
+  $('#tabs').innerHTML = '';
+  Object.entries(GAMES).forEach(([id, g]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = g.name;
+    b.setAttribute('aria-pressed', id === bGame); b.onclick = () => { bGame = id; renderBoard(); }; $('#tabs').appendChild(b);
+  });
+  $('#pWeek').setAttribute('aria-pressed', bPeriod === 'week'); $('#pAll').setAttribute('aria-pressed', bPeriod === 'all');
+  const list = $('#list'); list.innerHTML = '<li class="empty">Chargement…</li>';
+  const want = bGame + bPeriod;
+  try {
+    const rows = await Store.top(bGame, bPeriod);
+    if (want !== bGame + bPeriod) return;
+    if (!rows.length) { list.innerHTML = `<li class="empty">Personne n'a encore joué à ${GAMES[bGame].name} ${bPeriod === 'week' ? 'cette semaine' : ''}. Fais le premier score !</li>`; return; }
+    list.innerHTML = '';
+    rows.forEach((r, i) => {
+      const li = document.createElement('li'); if (r.pseudo === pseudo) li.className = 'me';
+      li.innerHTML = `<span class="pos">${i + 1}</span><span class="nm"></span><span class="sc">${r.score}</span>`;
+      li.querySelector('.nm').textContent = r.pseudo; list.appendChild(li);
+    });
+  } catch (e) { list.innerHTML = '<li class="empty">Impossible de charger le classement. Vérifie ta connexion.</li>'; }
+}
+
+/* ===== Événements ===== */
+$('#editBtn').onclick = () => { const f = $('#editForm'); f.hidden = !f.hidden; if (!f.hidden) { $('#pseudoInput').value = pseudo; $('#pseudoInput').focus(); } };
+$('#editForm').onsubmit = e => { e.preventDefault(); const v = cleanPseudo($('#pseudoInput').value); if (v.length >= 3) { pseudo = v; safeSet('mjc_pseudo', v); $('#editForm').hidden = true; renderHome(); } else $('#pseudoInput').value = v; };
+$('#quitBtn').onclick = quitGame;
+$('#boardBtn').onclick = () => openBoard();
+$('#boardBack').onclick = () => { renderHome(); show('home'); };
+$('#pWeek').onclick = () => { bPeriod = 'week'; renderBoard(); };
+$('#pAll').onclick = () => { bPeriod = 'all'; renderBoard(); };
+renderHome();
+</script>
+
+</body></html>
