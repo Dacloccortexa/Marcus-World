@@ -47,6 +47,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 .edit{display:flex;gap:8px;padding:12px;align-items:center;flex-wrap:wrap}
 .edit input{flex:1;min-width:0;border:3px solid var(--ink);border-radius:11px;padding:9px 11px;font:inherit;font-weight:800;font-size:16px}
 .edit p{margin:0;width:100%;font-size:13px;color:var(--muted)}
+.edit p.err{color:#C8234A;font-weight:900}
 .games{display:grid;gap:14px;overflow-y:auto;padding:2px 6px 8px 2px;flex:1;align-content:start}
 .card{display:grid;grid-template-columns:72px 1fr auto;gap:14px;align-items:center;padding:12px 14px;text-align:left}
 .card .ic{width:72px;height:72px;border:3px solid var(--ink);border-radius:14px;display:grid;place-items:center}
@@ -134,7 +135,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
   <form class="edit sticker" id="editForm" hidden>
     <input id="pseudoInput" maxlength="12" autocomplete="off" aria-label="Pseudo">
     <button class="btn small primary" type="submit">OK</button>
-    <p>3 à 12 caractères : lettres, chiffres ou _. Pas de vrai nom.</p>
+    <p id="pseudoHint">2 à 12 caractères : lettres (accents permis), chiffres, espace, - ou _.</p>
   </form>
   <div class="games" id="games"></div>
   <div class="foot">
@@ -184,7 +185,7 @@ function weekKey(d = new Date()) {
 const ANIMAUX = ['Panda','Requin','Faucon','Tigre','Loutre','Gecko','Lynx','Koala','Dauphin','Renard'];
 let pseudo = safeGet('mjc_pseudo', null);
 if (!pseudo) { pseudo = ANIMAUX[Math.floor(Math.random() * ANIMAUX.length)] + (10 + Math.floor(Math.random() * 90)); safeSet('mjc_pseudo', pseudo); }
-const cleanPseudo = s => s.replace(/[^A-Za-z0-9_]/g, '').slice(0, 12);
+const cleanPseudo = s => s.normalize('NFC').replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9_ -]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
 
 /* ===== Scores (Supabase si configuré, sinon local à l'appareil) ===== */
 const Store = {
@@ -649,7 +650,11 @@ async function renderBoard() {
 
 /* ===== Événements ===== */
 $('#editBtn').onclick = () => { const f = $('#editForm'); f.hidden = !f.hidden; if (!f.hidden) { $('#pseudoInput').value = pseudo; $('#pseudoInput').focus(); } };
-$('#editForm').onsubmit = e => { e.preventDefault(); const v = cleanPseudo($('#pseudoInput').value); if (v.length >= 3) { pseudo = v; safeSet('mjc_pseudo', v); $('#editForm').hidden = true; renderHome(); } else $('#pseudoInput').value = v; };
+$('#editForm').onsubmit = e => {
+  e.preventDefault(); const v = cleanPseudo($('#pseudoInput').value), hint = $('#pseudoHint');
+  if (v.length >= 2) { pseudo = v; safeSet('mjc_pseudo', v); hint.classList.remove('err'); $('#editForm').hidden = true; renderHome(); }
+  else { $('#pseudoInput').value = v; hint.textContent = 'Il faut au moins 2 lettres ou chiffres.'; hint.classList.add('err'); $('#pseudoInput').focus(); }
+};
 $('#quitBtn').onclick = quitGame;
 $('#boardBtn').onclick = () => openBoard();
 $('#boardBack').onclick = () => { renderHome(); show('home'); };
