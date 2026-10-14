@@ -57,6 +57,19 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 .card .rec b{display:block;font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums}
 .foot{display:flex;flex-direction:column;gap:8px}
 .mode{margin:0;font-size:12px;color:var(--muted);text-align:center}
+.mode b{color:var(--ink);letter-spacing:.12em}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mycode{padding:14px;display:grid;gap:8px}
+.mycode small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.code-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.code-row b{font-family:var(--display);font-weight:400;font-size:40px;letter-spacing:.14em;font-variant-numeric:tabular-nums}
+.mycode p{margin:0;font-size:13px;color:var(--muted)}
+#codeInput{text-transform:uppercase;letter-spacing:.14em}
+#codeInput::placeholder{text-transform:none;letter-spacing:0;font-weight:700}
+.edit p.ok{color:#127A55;font-weight:900}
+.fr{grid-template-columns:1fr auto!important}
+.fr .cd{display:block;font-size:12px;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.fr .btn.warn{background:var(--coral);color:#fff}
 
 /* Jeu */
 .bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -139,7 +152,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
   </form>
   <div class="games" id="games"></div>
   <div class="foot">
-    <button class="btn" id="boardBtn" type="button">Voir le classement</button>
+    <div class="duo"><button class="btn" id="boardBtn" type="button">Classement</button><button class="btn" id="friendsBtn" type="button">Amis</button></div>
     <p class="mode" id="modeTxt"></p>
   </div>
 </section>
@@ -162,7 +175,29 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
     <button type="button" id="pWeek" aria-pressed="true">Cette semaine</button>
     <button type="button" id="pAll" aria-pressed="false">Depuis toujours</button>
   </div>
+  <div class="seg sticker">
+    <button type="button" id="sAll" aria-pressed="true">Tout le monde</button>
+    <button type="button" id="sFriends" aria-pressed="false">Amis</button>
+  </div>
   <ol class="list sticker" id="list"></ol>
+</section>
+
+<section id="friends" class="screen" hidden>
+  <div class="bar">
+    <button class="btn small" id="friendsBack" type="button">← Retour</button>
+    <h2>Amis</h2>
+  </div>
+  <div class="mycode sticker">
+    <small>Ton code ami</small>
+    <div class="code-row"><b id="myCode">······</b><button class="btn small primary" id="copyBtn" type="button">Copier</button></div>
+    <p>Donne ce code à tes amis : quand l'un d'eux l'ajoute, vous devenez amis tous les deux.</p>
+  </div>
+  <form class="edit sticker" id="addForm">
+    <input id="codeInput" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code de ton ami" aria-label="Code de ton ami">
+    <button class="btn small primary" type="submit">Ajouter</button>
+    <p id="addMsg">Le code a 6 caractères, par exemple K7P2QX.</p>
+  </form>
+  <ul class="list sticker" id="friendList"></ul>
 </section>
 
 <script>
@@ -187,35 +222,41 @@ let pseudo = safeGet('mjc_pseudo', null);
 if (!pseudo) { pseudo = ANIMAUX[Math.floor(Math.random() * ANIMAUX.length)] + (10 + Math.floor(Math.random() * 90)); safeSet('mjc_pseudo', pseudo); }
 const cleanPseudo = s => s.normalize('NFC').replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9_ -]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
 
-/* ===== Scores (Supabase si configuré, sinon local à l'appareil) ===== */
-const Store = {
-  remote: !!(CONFIG.supabaseUrl && CONFIG.supabaseKey),
-  headers() { return { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json' }; },
-  async submit(game, score, duration) {
-    if (this.remote) {
-      const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/scores', { method: 'POST', headers: { ...this.headers(), Prefer: 'return=minimal' },
-        body: JSON.stringify({ game, pseudo, score, duration_ms: Math.round(duration) }) });
-      if (!r.ok) throw new Error('submit');
-    } else {
-      const all = safeGet('mjc_scores', []); all.push({ game, pseudo, score, week: weekKey(), ts: Date.now() }); safeSet('mjc_scores', all.slice(-2000));
-    }
-  },
-  async top(game, period) {
-    let rows;
-    if (this.remote) {
-      let q = `/rest/v1/scores?select=pseudo,score&game=eq.${game}&order=score.desc&limit=500`;
-      if (period === 'week') q += `&week=eq.${weekKey()}`;
-      const r = await fetch(CONFIG.supabaseUrl + q, { headers: this.headers() });
-      if (!r.ok) throw new Error('top');
-      rows = await r.json();
-    } else {
-      rows = safeGet('mjc_scores', []).filter(s => s.game === game && (period !== 'week' || s.week === weekKey()));
-    }
-    const best = new Map();
-    rows.forEach(s => { if (!best.has(s.pseudo) || best.get(s.pseudo) < s.score) best.set(s.pseudo, s.score); });
-    return [...best].map(([p, s]) => ({ pseudo: p, score: s })).sort((a, b) => b.score - a.score).slice(0, 50);
+/* ===== Joueur et serveur (Supabase) ===== */
+let me = safeGet('mjc_player', null); // { id, code }
+async function rpc(fn, args) {
+  const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST',
+    headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args) });
+  const t = await r.text(); let d = null; try { d = t ? JSON.parse(t) : null; } catch (e) {}
+  if (!r.ok) throw new Error((d && d.message) || 'network');
+  return d;
+}
+let ensuring = null;
+function ensurePlayer() {
+  if (me) return Promise.resolve(me);
+  if (!ensuring) ensuring = rpc('register_player', { p_pseudo: pseudo })
+    .then(rows => { me = rows[0]; safeSet('mjc_player', me); renderHome(); return me; })
+    .finally(() => { ensuring = null; });
+  return ensuring;
+}
+async function withPlayer(fn) {
+  await ensurePlayer();
+  try { return await fn(me); }
+  catch (e) {
+    if (!/unknown_player/.test(e.message)) throw e;
+    me = null; safeSet('mjc_player', null); await ensurePlayer(); return fn(me);
   }
+}
+const Store = {
+  submit: (game, score, duration) => withPlayer(p => rpc('submit_score', { p_player: p.id, p_game: game, p_score: score, p_duration: Math.round(duration) })),
+  top: (game, period, scope) => withPlayer(p => rpc('leaderboard', { p_game: game, p_period: period, p_player: p.id, p_scope: scope })),
+  setPseudo: v => withPlayer(p => rpc('set_pseudo', { p_player: p.id, p_pseudo: v })),
+  addFriend: code => withPlayer(p => rpc('add_friend', { p_player: p.id, p_code: code })),
+  removeFriend: code => withPlayer(p => rpc('remove_friend', { p_player: p.id, p_code: code })),
+  friends: () => withPlayer(p => rpc('list_friends', { p_player: p.id }))
 };
+const nth = n => n + (n === 1 ? 'er' : 'e');
 
 /* ===== Moteur canvas commun ===== */
 function runCanvas(area, game) {
@@ -575,7 +616,7 @@ const GAMES = {
 };
 
 /* ===== Navigation ===== */
-function show(id) { ['home', 'play', 'board'].forEach(s => $('#' + s).hidden = s !== id); }
+function show(id) { ['home', 'play', 'board', 'friends'].forEach(s => $('#' + s).hidden = s !== id); }
 const best = safeGet('mjc_best', {});
 
 function renderHome() {
@@ -588,7 +629,8 @@ function renderHome() {
     b.onclick = () => startGame(id);
     $('#games').appendChild(b);
   });
-  $('#modeTxt').textContent = Store.remote ? 'Classement en ligne entre tous les joueurs' : 'Mode test : classement enregistré sur cet appareil';
+  $('#modeTxt').innerHTML = me ? 'Ton code ami : <b></b>' : 'Classement en ligne entre tous les joueurs';
+  if (me) $('#modeTxt b').textContent = me.code;
 }
 
 let stopFn = null, runId = 0, current = null;
@@ -617,14 +659,15 @@ async function gameOver(id, score, dur) {
   const rankEl = ov.querySelector('.rank');
   try {
     if (score > 0) await Store.submit(id, score, dur);
-    const top = await Store.top(id, 'week');
-    const pos = top.findIndex(r => r.pseudo === pseudo);
-    rankEl.textContent = pos >= 0 ? `Tu es ${pos + 1}${pos === 0 ? 'er' : 'e'} cette semaine` : 'Marque des points pour entrer au classement';
+    const [all, fr] = await Promise.all([Store.top(id, 'week', 'all'), Store.top(id, 'week', 'friends')]);
+    const a = all.find(r => r.is_me), f = fr.find(r => r.is_me);
+    if (!a) rankEl.textContent = 'Marque des points pour entrer au classement';
+    else rankEl.textContent = `${nth(a.pos)} cette semaine` + (fr.length > 1 && f ? ` · ${nth(f.pos)} chez tes amis` : '');
   } catch (e) { rankEl.textContent = 'Score non envoyé : vérifie ta connexion'; }
 }
 
 /* ===== Classement ===== */
-let bGame = 'tour', bPeriod = 'week';
+let bGame = 'tour', bPeriod = 'week', bScope = 'all';
 function openBoard(id) { if (id) bGame = id; show('board'); renderBoard(); }
 async function renderBoard() {
   $('#tabs').innerHTML = '';
@@ -633,26 +676,79 @@ async function renderBoard() {
     b.setAttribute('aria-pressed', id === bGame); b.onclick = () => { bGame = id; renderBoard(); }; $('#tabs').appendChild(b);
   });
   $('#pWeek').setAttribute('aria-pressed', bPeriod === 'week'); $('#pAll').setAttribute('aria-pressed', bPeriod === 'all');
+  $('#sAll').setAttribute('aria-pressed', bScope === 'all'); $('#sFriends').setAttribute('aria-pressed', bScope === 'friends');
   const list = $('#list'); list.innerHTML = '<li class="empty">Chargement…</li>';
-  const want = bGame + bPeriod;
+  const want = bGame + bPeriod + bScope;
   try {
-    const rows = await Store.top(bGame, bPeriod);
-    if (want !== bGame + bPeriod) return;
+    const rows = await Store.top(bGame, bPeriod, bScope);
+    if (want !== bGame + bPeriod + bScope) return;
+    if (bScope === 'friends' && !rows.some(r => !r.is_me)) {
+      const fl = await Store.friends();
+      if (!fl.length) { list.innerHTML = '<li class="empty">Tu n\'as pas encore d\'amis. Ajoute-les avec leur code ami.<br><br><button class="btn small primary" type="button" id="goFriends">Ajouter un ami</button></li>'; $('#goFriends').onclick = openFriends; return; }
+    }
     if (!rows.length) { list.innerHTML = `<li class="empty">Personne n'a encore joué à ${GAMES[bGame].name} ${bPeriod === 'week' ? 'cette semaine' : ''}. Fais le premier score !</li>`; return; }
     list.innerHTML = '';
-    rows.forEach((r, i) => {
-      const li = document.createElement('li'); if (r.pseudo === pseudo) li.className = 'me';
-      li.innerHTML = `<span class="pos">${i + 1}</span><span class="nm"></span><span class="sc">${r.score}</span>`;
+    rows.forEach(r => {
+      const li = document.createElement('li'); if (r.is_me) li.className = 'me';
+      li.innerHTML = `<span class="pos">${r.pos}</span><span class="nm"></span><span class="sc">${r.score}</span>`;
       li.querySelector('.nm').textContent = r.pseudo; list.appendChild(li);
     });
   } catch (e) { list.innerHTML = '<li class="empty">Impossible de charger le classement. Vérifie ta connexion.</li>'; }
 }
 
+/* ===== Amis ===== */
+function openFriends() { show('friends'); renderFriends(); }
+async function renderFriends() {
+  const list = $('#friendList');
+  list.innerHTML = '<li class="empty">Chargement…</li>';
+  try {
+    await ensurePlayer(); $('#myCode').textContent = me.code;
+    const fl = await Store.friends();
+    if (!fl.length) { list.innerHTML = '<li class="empty">Pas encore d\'amis. Entre le code d\'un ami ci-dessus.</li>'; return; }
+    list.innerHTML = '';
+    fl.forEach(f => {
+      const li = document.createElement('li'); li.className = 'fr';
+      li.innerHTML = '<span class="nm"></span><button class="btn small" type="button">Retirer</button>';
+      const nm = li.querySelector('.nm'); nm.textContent = f.pseudo;
+      const cd = document.createElement('span'); cd.className = 'cd'; cd.textContent = f.code; nm.appendChild(cd);
+      const b = li.querySelector('button');
+      b.onclick = async () => {
+        if (!b.classList.contains('warn')) { b.classList.add('warn'); b.textContent = 'Sûr ?'; setTimeout(() => { b.classList.remove('warn'); b.textContent = 'Retirer'; }, 3000); return; }
+        b.disabled = true; try { await Store.removeFriend(f.code); renderFriends(); } catch (e) { b.textContent = 'Erreur'; }
+      };
+      list.appendChild(li);
+    });
+  } catch (e) { list.innerHTML = '<li class="empty">Impossible de charger tes amis. Vérifie ta connexion.</li>'; }
+}
+$('#addForm').onsubmit = async e => {
+  e.preventDefault();
+  const inp = $('#codeInput'), msg = $('#addMsg'), code = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  inp.value = code; msg.className = '';
+  if (code.length !== 6) { msg.textContent = 'Le code doit faire 6 caractères.'; msg.className = 'err'; return; }
+  msg.textContent = 'Recherche…';
+  try {
+    const name = await Store.addFriend(code);
+    msg.textContent = `${name} est maintenant ton ami !`; msg.className = 'ok'; inp.value = ''; renderFriends();
+  } catch (err) {
+    msg.className = 'err';
+    msg.textContent = /code_not_found/.test(err.message) ? 'Aucun joueur avec ce code. Vérifie les lettres.'
+      : /own_code/.test(err.message) ? 'C\'est ton propre code !'
+      : /too_many/.test(err.message) ? 'Tu as déjà 100 amis, c\'est le maximum.'
+      : 'Impossible d\'ajouter : vérifie ta connexion.';
+  }
+};
+$('#copyBtn').onclick = () => {
+  const code = $('#myCode').textContent, b = $('#copyBtn');
+  const done = () => { b.textContent = 'Copié !'; setTimeout(() => b.textContent = 'Copier', 1500); };
+  try { navigator.clipboard.writeText(code).then(done, () => selectCode()); } catch (e) { selectCode(); }
+};
+function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
 /* ===== Événements ===== */
 $('#editBtn').onclick = () => { const f = $('#editForm'); f.hidden = !f.hidden; if (!f.hidden) { $('#pseudoInput').value = pseudo; $('#pseudoInput').focus(); } };
 $('#editForm').onsubmit = e => {
   e.preventDefault(); const v = cleanPseudo($('#pseudoInput').value), hint = $('#pseudoHint');
-  if (v.length >= 2) { pseudo = v; safeSet('mjc_pseudo', v); hint.classList.remove('err'); $('#editForm').hidden = true; renderHome(); }
+  if (v.length >= 2) { pseudo = v; safeSet('mjc_pseudo', v); hint.classList.remove('err'); $('#editForm').hidden = true; renderHome(); if (me) Store.setPseudo(v).catch(() => {}); }
   else { $('#pseudoInput').value = v; hint.textContent = 'Il faut au moins 2 lettres ou chiffres.'; hint.classList.add('err'); $('#pseudoInput').focus(); }
 };
 $('#quitBtn').onclick = quitGame;
@@ -660,7 +756,13 @@ $('#boardBtn').onclick = () => openBoard();
 $('#boardBack').onclick = () => { renderHome(); show('home'); };
 $('#pWeek').onclick = () => { bPeriod = 'week'; renderBoard(); };
 $('#pAll').onclick = () => { bPeriod = 'all'; renderBoard(); };
+$('#sAll').onclick = () => { bScope = 'all'; renderBoard(); };
+$('#sFriends').onclick = () => { bScope = 'friends'; renderBoard(); };
+$('#friendsBtn').onclick = openFriends;
+$('#friendsBack').onclick = () => { renderHome(); show('home'); };
+$('#codeInput').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
 renderHome();
+ensurePlayer().catch(() => {});
 </script>
 
 </body></html>
