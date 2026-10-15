@@ -58,6 +58,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 .foot{display:flex;flex-direction:column;gap:8px}
 .mode{margin:0;font-size:12px;color:var(--muted);text-align:center}
 .mode b{color:var(--ink);letter-spacing:.12em}
+.update{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 10px 10px 14px;background:var(--mint);animation:pop .35s}
+.update span{font-size:14px;line-height:1.25}
+.update .btn{white-space:nowrap}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mycode{padding:14px;display:grid;gap:8px}
 .mycode small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -149,6 +152,10 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 </head><body>
 
 <section id="home" class="screen">
+  <div class="update sticker" id="updateBar" hidden>
+    <span><b>Nouvelle version</b> de Marcus World disponible</span>
+    <button class="btn small primary" id="updateBtn" type="button">Mettre à jour</button>
+  </div>
   <div class="top">
     <h1 class="logo"><img src="icons/icon-192.png" alt=""><span class="w">Marcus<br><span>World</span></span></h1>
     <div class="player sticker" id="playerBox">
@@ -910,6 +917,25 @@ $('#copyBtn').onclick = () => {
   try { navigator.clipboard.writeText(code).then(done, () => selectCode()); } catch (e) { selectCode(); }
 };
 function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+/* ===== Mises à jour ===== */
+const APP_VERSION = '202610151327';
+let newVersion = null;
+async function checkUpdate() {
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const { version } = await r.json();
+    if (version && version !== APP_VERSION) { newVersion = version; $('#updateBar').hidden = false; }
+  } catch (e) {}
+}
+$('#updateBtn').onclick = () => {
+  $('#updateBtn').textContent = 'Chargement…';
+  location.replace(location.pathname + '?v=' + encodeURIComponent(newVersion || Date.now()));
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+setInterval(checkUpdate, 5 * 60 * 1000);
+checkUpdate();
 
 /* ===== Événements ===== */
 $('#editBtn').onclick = () => { const f = $('#editForm'); f.hidden = !f.hidden; if (!f.hidden) { $('#pseudoInput').value = pseudo; $('#pseudoInput').focus(); } };
