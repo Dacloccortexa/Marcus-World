@@ -277,6 +277,26 @@ const Store = {
 };
 const nth = n => n + (n === 1 ? 'er' : 'e');
 
+/* Scores pas encore envoyés : gardés sur le téléphone et renvoyés dès que possible */
+let flushing = null;
+function queueScore(game, score, dur) {
+  const q = safeGet('mjc_outbox', []); q.push({ game, score, dur: Math.round(dur) }); safeSet('mjc_outbox', q.slice(-50));
+}
+function flushScores() {
+  if (flushing) return flushing;
+  flushing = (async () => {
+    let q = safeGet('mjc_outbox', []);
+    while (q.length) {
+      const s = q[0];
+      try { await Store.submit(s.game, s.score, s.dur); }
+      catch (e) { if (/network|Failed to fetch|Load failed/i.test(e.message)) break; }  // hors ligne : on réessaiera
+      q = safeGet('mjc_outbox', []).slice(1); safeSet('mjc_outbox', q);
+    }
+  })().finally(() => { flushing = null; });
+  return flushing;
+}
+async function sendScore(game, score, dur) { queueScore(game, score, dur); await flushScores(); return !safeGet('mjc_outbox', []).length; }
+
 /* ===== Moteur canvas commun ===== */
 function runCanvas(area, game) {
   const c = document.createElement('canvas'); area.appendChild(c);
@@ -823,7 +843,7 @@ function quitGame() {
   if (stopFn) stopFn(); stopFn = null;
   if (p && p.score > 0 && current) {
     if (p.score > (best[current] ?? -1)) { best[current] = p.score; safeSet('mjc_best', best); }
-    Store.submit(current, p.score, p.dur).catch(() => {});
+    sendScore(current, p.score, p.dur).catch(() => {});
   }
   renderHome(); show('home');
 }
@@ -844,12 +864,12 @@ async function gameOver(id, score, dur) {
   ov.querySelector('[data-a="again"]').focus();
   const rankEl = ov.querySelector('.rank');
   try {
-    if (score > 0) await Store.submit(id, score, dur);
+    if (score > 0 && !(await sendScore(id, score, dur))) throw new Error('offline');
     const [all, fr] = await Promise.all([Store.top(id, 'week', 'all'), Store.top(id, 'week', 'friends')]);
     const a = all.find(r => r.is_me), f = fr.find(r => r.is_me);
     if (!a) rankEl.textContent = 'Marque des points pour entrer au classement';
     else rankEl.textContent = `${nth(a.pos)} cette semaine` + (fr.length > 1 && f ? ` · ${nth(f.pos)} chez tes amis` : '');
-  } catch (e) { rankEl.textContent = 'Score non envoyé : vérifie ta connexion'; }
+  } catch (e) { rankEl.textContent = 'Pas de connexion : ton score sera envoyé automatiquement plus tard'; }
 }
 
 /* ===== Classement ===== */
@@ -931,7 +951,7 @@ $('#copyBtn').onclick = () => {
 function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
 /* ===== Mises à jour ===== */
-const APP_VERSION = '202610151347';
+const APP_VERSION = '202610151349';
 let newVersion = null;
 async function checkUpdate() {
   try {
@@ -945,7 +965,8 @@ $('#updateBtn').onclick = () => {
   $('#updateBtn').textContent = 'Chargement…';
   location.replace(location.pathname + '?v=' + encodeURIComponent(newVersion || Date.now()));
 };
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkUpdate(); flushScores(); } });
+addEventListener('online', () => flushScores());
 setInterval(checkUpdate, 5 * 60 * 1000);
 checkUpdate();
 
@@ -967,7 +988,7 @@ $('#friendsBtn').onclick = openFriends;
 $('#friendsBack').onclick = () => { renderHome(); show('home'); };
 $('#codeInput').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
 renderHome();
-ensurePlayer().catch(() => {});
+ensurePlayer().then(flushScores).catch(() => {});
 </script>
 
 </body></html>
