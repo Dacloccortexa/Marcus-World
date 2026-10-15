@@ -37,11 +37,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 
 /* Accueil */
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:nowrap}
-.logo{display:flex;align-items:center;gap:10px;flex-shrink:0;font-family:var(--display);font-weight:400;font-size:clamp(26px,8vw,40px);line-height:.92;letter-spacing:.5px;margin:0}
-.logo img{width:clamp(48px,14vw,68px);height:auto;border:3px solid var(--ink);border-radius:18px;box-shadow:3px 3px 0 var(--ink);transform:rotate(-6deg)}
+.logo{display:flex;align-items:center;gap:8px;flex-shrink:0;font-family:var(--display);font-weight:400;font-size:clamp(24px,7.4vw,40px);line-height:.92;letter-spacing:.5px;margin:0}
+.logo img{width:clamp(44px,12.5vw,68px);height:auto;border:3px solid var(--ink);border-radius:18px;box-shadow:3px 3px 0 var(--ink);transform:rotate(-6deg)}
 .logo .w{color:var(--ink)}
 .logo .w span{color:var(--coral)}
-.player{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px 10px;min-width:0;max-width:170px;flex:0 1 auto}
+.player{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px 10px;min-width:0;flex:1 1 auto;max-width:260px}
 .player>div{min-width:0}
 .player small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .player b{display:block;font-size:17px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -920,7 +920,7 @@ $('#copyBtn').onclick = () => {
 function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
 /* ===== Mises à jour ===== */
-const APP_VERSION = '202610151329';
+const APP_VERSION = '202610151335';
 let newVersion = null;
 async function checkUpdate() {
   try {
