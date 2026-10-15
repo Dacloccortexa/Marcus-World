@@ -42,7 +42,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--coral);outline-
 .logo .w{color:var(--ink)}
 .logo .w span{color:var(--coral)}
 .player{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px 10px;min-width:0;flex:1 1 auto;max-width:260px}
-.player>div{min-width:0}
+.player>div{min-width:0;text-align:center}
 .player small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .player b{display:block;font-size:17px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .edit{display:flex;gap:8px;padding:12px;align-items:center;flex-wrap:wrap}
@@ -920,7 +920,7 @@ $('#copyBtn').onclick = () => {
 function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
 /* ===== Mises à jour ===== */
-const APP_VERSION = '202610151335';
+const APP_VERSION = '202610151340';
 let newVersion = null;
 async function checkUpdate() {
   try {
