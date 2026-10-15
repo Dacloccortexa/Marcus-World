@@ -763,7 +763,9 @@ function Memoire(area, end) {
     if (idx === seq.length) { score = seq.length; sEl.textContent = score; input = false; stEl.textContent = 'Bravo !'; timers.push(setTimeout(play, 700)); }
   }));
   play();
-  return () => { done = true; timers.forEach(clearTimeout); root.remove(); try { ac && ac.close(); } catch (e) {} };
+  const stop = () => { done = true; timers.forEach(clearTimeout); root.remove(); try { ac && ac.close(); } catch (e) {} };
+  stop.pending = () => done ? null : { score, dur: performance.now() - t0 };
+  return stop;
 }
 
 /* ===== Catalogue ===== */
@@ -815,7 +817,16 @@ function startGame(id) {
   const my = ++runId;
   stopFn = GAMES[id].make(area, (score, dur) => { if (my === runId) gameOver(id, score, dur); });
 }
-function quitGame() { runId++; if (stopFn) stopFn(); stopFn = null; renderHome(); show('home'); }
+function quitGame() {
+  runId++;
+  const p = stopFn && stopFn.pending && stopFn.pending();
+  if (stopFn) stopFn(); stopFn = null;
+  if (p && p.score > 0 && current) {
+    if (p.score > (best[current] ?? -1)) { best[current] = p.score; safeSet('mjc_best', best); }
+    Store.submit(current, p.score, p.dur).catch(() => {});
+  }
+  renderHome(); show('home');
+}
 
 async function gameOver(id, score, dur) {
   const isRec = score > 0 && score > (best[id] ?? -1);
@@ -920,7 +931,7 @@ $('#copyBtn').onclick = () => {
 function selectCode() { const r = document.createRange(); r.selectNodeContents($('#myCode')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
 /* ===== Mises à jour ===== */
-const APP_VERSION = '202610151340';
+const APP_VERSION = '202610151347';
 let newVersion = null;
 async function checkUpdate() {
   try {
